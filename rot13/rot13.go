@@ -12,11 +12,11 @@ type rot13Reader struct {
 	r io.Reader
 }
 
-func (rotReader rot13Reader) Read(b []byte) (int, error) {
-	reader := rotReader.r
+func (reader rot13Reader) Read(b []byte) (int, error) {
+	origReader := reader.r
 	origData := make([]byte, len(b))
 
-	n, err := reader.Read(origData)
+	n, err := origReader.Read(origData)
 	if err != nil {
 		return n, err
 	}
