@@ -13,7 +13,7 @@ import (
 
 func main() {
 	m := Image{180, 200}
-	saveImage(m)
+	saveImage(m, "pic2.png")
 }
 
 type Image struct {
@@ -44,14 +44,14 @@ func countColor(x, y int) uint8 {
 	return uint8(v)
 }
 
-func saveImage(m image.Image) {
+func saveImage(m image.Image, filename string) {
 	var imgBuf bytes.Buffer
+
 	err := png.Encode(&imgBuf, m)
 	if err != nil {
 		panic(err)
 	}
 
-	filename := "pic.png"
 	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		log.Fatal(err)
