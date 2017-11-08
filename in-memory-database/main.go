@@ -2,25 +2,27 @@ package main
 
 import (
 	"bufio"
+	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
-	"os"
 	"strings"
+
+	"github.com/crywolf/goexperiments/in-memory-database/storage"
 )
 
-var data map[string]string
+var (
+	database storage.Db
+	port     = flag.String("port", "8080", "Listen on port number")
+)
 
 func main() {
-	data = make(map[string]string)
+	flag.Parse()
+	database = storage.GetDatabase()
 
-	port := "8080"
-	if len(os.Args) > 1 {
-		port = os.Args[1]
-	}
-
-	li, err := net.Listen("tcp", ":"+port)
-	log.Println("Listening on localhost:" + port)
+	li, err := net.Listen("tcp", fmt.Sprintf(":%s", *port))
+	log.Printf("Listening on localhost:%s\n", *port)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -38,81 +40,100 @@ func main() {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	io.WriteString(conn, "\r\nIN-MEMORY DATABASE\r\n\r\n"+
+	provideIntroductionHelp(conn)
+
+	handleCommands(conn)
+}
+
+func provideIntroductionHelp(conn net.Conn) (int, error) {
+	return io.WriteString(conn, "\r\nIN-MEMORY DATABASE\r\n\r\n"+
 		"USE:\r\n"+
 		"\tSET key value \r\n"+
 		"\tGET key \r\n"+
-		"\tDEL key \r\n\r\n"+
+		"\tDEL key \r\n"+
+		"\tQUIT\r\n\r\n"+
 		"EXAMPLE:\r\n"+
 		"\tSET fav chocolate \r\n"+
 		"\tGET fav \r\n\r\n\r\n")
+}
 
+func handleCommands(conn net.Conn) {
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		ln := scanner.Text()
-		log.Println(ln)
-		resp, err := processCommand(ln)
-		if err != nil {
-			log.Println(err)
+
+		fs := strings.Fields(ln)
+		if len(fs) == 0 {
+			io.WriteString(conn, "-> Missing command!\n")
+			continue
 		}
+
+		cmd := fs[0]
+		args := fs[1:]
+
+		if cmd == "QUIT" {
+			break
+		}
+
+		resp, err := processCommand(cmd, args)
+		if err != nil {
+			log.Println(ln, ":", err)
+			continue
+		}
+
+		log.Println(ln)
+
+		if resp != "" {
+			resp = fmt.Sprintf("-> %s\n", resp)
+		}
+
 		io.WriteString(conn, resp)
 	}
 }
 
-func processCommand(ln string) (string, error) {
-	ret := ""
-
-	fs := strings.Fields(ln)
-	if len(fs) == 0 {
-		return "Missing command!\n", nil
-	}
-
-	cmd := fs[0]
-	args := fs[1:]
-
+func processCommand(cmd string, args []string) (string, error) {
 	switch cmd {
 	case "GET":
 		ok, message := checkCommand(cmd, args)
 		if !ok {
 			return message, nil
 		}
-		k := fs[1]
-		ret = data[k] + "\n"
+		key := args[0]
+		return database.Get(key)
 	case "SET":
 		ok, message := checkCommand(cmd, args)
 		if !ok {
 			return message, nil
 		}
-		k := fs[1]
-		v := fs[2]
-		data[k] = v
+		key := args[0]
+		val := args[1]
+		return database.Set(key, val)
 	case "DEL":
 		ok, message := checkCommand(cmd, args)
 		if !ok {
 			return message, nil
 		}
-		k := fs[1]
-		delete(data, k)
+		key := args[0]
+		return database.Del(key)
 	default:
-		ret = "Invalid command!\n"
+		return "Invalid command!", nil
 	}
-
-	return ret, nil
 }
 
 func checkCommand(cmd string, args []string) (ok bool, message string) {
 	switch cmd {
 	case "GET", "DEL":
 		if len(args) == 0 {
-			return false, "Missing key!\n"
+			return false, "Missing key!"
 		}
 	case "SET":
 		if len(args) == 0 {
-			return false, "Missing key and value!\n"
+			return false, "Missing key and value!"
 		}
 		if len(args) == 1 {
-			return false, "Missing value!\n"
+			return false, "Missing value!"
 		}
 	}
+
 	return true, ""
 }
