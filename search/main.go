@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/crywolf/goexperiments/search/fsearch"
@@ -32,7 +35,25 @@ func main() {
 	http.HandleFunc("/search", handleSearch)
 	http.HandleFunc("/health", handleHealth)
 	log.Printf("serving on http://localhost:%s/search\n", *port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", *port), nil))
+
+	s := http.Server{Addr: fmt.Sprintf(":%s", *port)}
+	go func() {
+		log.Print(s.ListenAndServe())
+	}()
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	<-signalChan
+
+	log.Println("shutdown signal received, exiting...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := s.Shutdown(ctx); err != nil {
+		// Error from closing listeners, or context timeout:
+		log.Printf("HTTP server shutdown: %v", err)
+		os.Exit(1)
+	}
 }
 
 func handleSearch(w http.ResponseWriter, req *http.Request) {
