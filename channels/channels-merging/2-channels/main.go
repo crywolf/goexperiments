@@ -7,8 +7,8 @@ import (
 )
 
 func main() {
-	a := asChan(1, 3, 5, 7)
-	b := asChan(2, 4, 6, 8)
+	a := asChan(0, 1, 2, 3, 4)
+	b := asChan(5, 6, 7, 8, 9)
 
 	c := merge(a, b)
 	for v := range c {
@@ -17,10 +17,10 @@ func main() {
 }
 
 func merge(a, b <-chan int) <-chan int {
-	c := make(chan int)
+	out := make(chan int)
 
 	go func() {
-		defer close(c)
+		defer close(out)
 
 		for a != nil || b != nil {
 			select {
@@ -30,26 +30,27 @@ func merge(a, b <-chan int) <-chan int {
 					fmt.Println("a is done")
 					continue
 				}
-				c <- v
+				out <- v
 			case v, ok := <-b:
 				if !ok {
 					b = nil
 					fmt.Println("b is done")
 					continue
 				}
-				c <- v
+				out <- v
 			}
 		}
 	}()
 
-	return c
+	return out
 }
 
-func asChan(vs ...int) <-chan int {
+func asChan(n ...int) <-chan int {
 	c := make(chan int)
+	rand.Seed(time.Now().UnixNano())
 
 	go func() {
-		for _, v := range vs {
+		for _, v := range n {
 			c <- v
 			time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 		}
