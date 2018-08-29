@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fakesearch-deployment
+  labels:
+    app: fakesearch
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fakesearch
+  template:
+    metadata:
+      labels:
+        app: fakesearch
+    spec:
+      containers:
+      - name: fakesearch
+        image: crywolf108/fakesearch
+        args: ["-mode=timeout"]
+        ports:
+        - name: fakesearch-port
+          containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: fakesearch-port
+            httpHeaders:
+            - name: X-Custom-Header
+              value: Healthcheck probe
+          initialDelaySeconds: 15
+          timeoutSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fakesearch
+  namespace: default
+spec:
+  selector:
+    app: fakesearch
+  ports:
+  - port: 31001
+    nodePort: 31001
+    targetPort: fakesearch-port
+  type: NodePort
