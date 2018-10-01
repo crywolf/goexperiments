@@ -3,15 +3,20 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 )
 
 func main() {
+	interpret(os.Stdin, os.Stdout, os.Stderr)
+}
+
+func interpret(reader io.Reader, writer io.Writer, errWriter io.Writer) {
 	variables := make(map[string]int)
 
-	scanner := bufio.NewScanner(os.Stdin)
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
 		tokens := strings.Fields(line)
@@ -64,7 +69,7 @@ func main() {
 			}
 		}
 		if errOccurred {
-			printError()
+			printError(errWriter)
 			continue
 		}
 
@@ -76,18 +81,17 @@ func main() {
 		case "PRINT":
 			res, varExists := variables[op1]
 			if !varExists {
-				printError()
+				printError(errWriter)
 				continue
 			}
-			fmt.Fprintf(os.Stdout, "-> %d\n", res)
+			fmt.Fprintf(writer, "%d\n", res)
 		}
 	}
-
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintf(os.Stderr, "error reading input: %v", err)
+		fmt.Fprintf(errWriter, "error reading input: %v", err)
 	}
 }
 
-func printError() {
-	fmt.Fprintln(os.Stderr, "Error!")
+func printError(writer io.Writer) {
+	fmt.Fprintln(writer, "Error!")
 }
